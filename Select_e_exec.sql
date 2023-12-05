@@ -90,7 +90,7 @@ ON i.ID = u.ID
 GROUP BY Nome_UF
 ORDER BY MediaPorMetroQuadrado ASC;
 
--- Traga em uma consulta os estados com menor e maitro média por metro quadrado
+-- Traga em uma consulta os estados com menor e maior média por metro quadrado
 	--1* primeira forma feita
 SELECT TOP 2
     Nome_UF, CAST (sum(Valor_Imovel) / sum(Area_util) as Decimal(10,2))
@@ -103,64 +103,74 @@ ORDER BY MediaPorMetroQuadrado ASC;
 
 --2* segunda forma feita
 go
-Create view MediaPorMetroQuadrado as
-WITH MediaPorMetroQuadradoCTE AS (
-    SELECT
-        Nome_UF,
-        CAST(SUM(Valor_imovel) / SUM(Area_util) AS DECIMAL(10, 2)) AS MediaPorMetroQuadrado
-    FROM UF u
-    JOIN Imovel i ON i.ID = u.ID
-    GROUP BY Nome_UF
-)
+Create view vw_MediaPorMetroQuadrado_EstadosCidades as
+WITH MediaPorMetroQuadrado AS (
+    SELECT c.Nome_Cidade as 
+		Cidades,
+       AVG(i.Valor_imovel / Area_util * 1.0) AS MediaPorMetroQuadrado
+    FROM Imovel i
+	join Endereco e ON i.fk_Endereco_ID = e.ID
+	join Bairro b ON e.fk_Bairro_ID = b.ID
+	join Cidade c ON b.fk_Cidade_ID = c.ID
+	join UF u on c.fk_UF_ID = u.ID
+	Group by c.Nome_cidade
+	
+	)
+  
 
+  
 SELECT TOP 2
-    Nome_UF,
-    MediaPorMetroQuadrado
-FROM MediaPorMetroQuadradoCTE
-ORDER BY MediaPorMetroQuadrado ASC;
+    MediaPorMetroQuadrado.Cidades,
+	FORMAT(MediaPorMetroQuadrado.MediaPorMetroQuadrado, 'C','PT-BR') AS MediaPorMetro
+FROM MediaPorMetroQuadrado
+go
 
-
-select * from MediaPorMetroQuadrado;
+select * from vw_MediaPorMetroQuadrado_EstadosCidades;
 	--Consulta com mais de um imovel por estado ou/e cidade
 
 
 go
-create view MediaMetro as
+create view vw_MediaMetro as
 WITH MediaPorMetroQuadradoCTE AS (
     SELECT
         i.ID,
         u.Nome_UF,
         c.Nome_Cidade,
-       cast( AVG(i.Valor_Imovel / i.Area_util)  AS Decimal(10,2) )as MediaPorMetroQuadrado
+       FORMAT(AVG(i.Valor_Imovel / i.Area_util), 'C', 'PT-BR' )as MediaPorMetroQuadrado
     FROM  Imovel i 
-    JOIN Endereco e ON i.fk_Endereco_ID = e.ID -- Ajustado para usar o ID correto
+    JOIN Endereco e ON i.fk_Endereco_ID = e.ID 
     JOIN Bairro b ON e.fk_Bairro_ID = b.ID
     JOIN Cidade c ON b.fk_Cidade_ID = c.ID
     JOIN UF u ON c.fk_UF_ID = u.ID
     GROUP BY u.Nome_UF, c.Nome_Cidade, i.ID
-)
-
+);
+go
 SELECT
-    Nome_UF,
+    
+	ID,
+	Nome_UF,
     Nome_Cidade,
-    ID,
     MediaPorMetroQuadrado
-FROM MediaPorMetroQuadradoCTE
+FROM vw_MediaMetro;
 
 ;
 go
+
+select * from MediaMetro;
+
+drop view MediaMetro;
 /*
 - pegar imoveis de rio branco - media do metro quadrado
 - pegar os imoveis de salvador - media do metro quadrado
 */
 
-select * from MediaMetro where MediaMetro.Nome_cidade = 'Salvador' or MediaMetro.Nome_cidade = 'Rio Branco'
+select * from vw_MediaMetro where vw_MediaMetro.Nome_cidade = 'Salvador' or vw_MediaMetro.Nome_cidade = 'Rio Branco'
 
 /*
 -Consulta com 5 Cidades com maior média de valor por metro quadrado
 */
 go
-Create View top5ImoveisComMaiorMedia as
+Create View vw_top5ImoveisComMaiorMedia as
 SELECT TOP 5
 	u.Sigla_UF,
 	c.nome_cidade,
@@ -175,16 +185,19 @@ SELECT TOP 5
 	ORDER BY QntdeImoveis DESC;
 go
 	
-Select * from top5ImoveisComMaiorMedia 
+Select * from vw_top5ImoveisComMaiorMedia 
 
 	/*
 	--faça uma busca se mostra todos os imoveis que tenha áreas entre 110 330 e de o desconto no valor do imovel de 30%
 	*/
 	GO
-	CREATE VIEW AreasComDescontoDe30 as 
-		SELECT ID, Area_util, FORMAT(Valor_imovel, 'C','pt_BR') AS Valor_Imovel, FORMAT(Valor_imovel*0.7, 'C', 'pt-BR') AS Valor_Desconto
+	CREATE VIEW vw_AreasComDescontoDe30 as 
+		SELECT ID, Area_util, FORMAT(Valor_imovel, 'C','pt_BR') AS Valor_Imovel, FORMAT(Valor_imovel*0.7, 'C', 'pt-BR') AS Valor_Com_Desconto
 	FROM Imovel;
 	GO
 
-SELECT * FROM AreasComDescontoDe30 WHERE Area_util BETWEEN 110 AND 330
+SELECT * FROM vw_AreasComDescontoDe30 WHERE Area_util BETWEEN 110 AND 330
 ORDER BY Valor_Imovel DESC;
+
+/*
+*/
